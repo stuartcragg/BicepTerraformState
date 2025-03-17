@@ -1,0 +1,26 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "value": "westeurope"
+    },
+    "environment": {
+      "value": "dev"
+    },
+    "oidcIssuerUrl": {
+      "value": "https://token.actions.githubusercontent.com"
+    },
+    "oidcSubject": {
+      "value": "repo:stuart-org/terraform-deploy:ref:refs/heads/main"
+    },
+    "tags": {
+      "value": {
+        "environment": "dev",
+        "project": "terraform-prereqs",
+        "department": "infrastructure",
+        "owner": "stuart"
+      }
+    }
+  }
+}

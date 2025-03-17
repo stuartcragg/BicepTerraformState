@@ -1,0 +1,63 @@
+trigger:
+- main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  - group: 'terraform-prereqs-vars' # Variable group for shared settings
+
+stages:
+- stage: DeployTerraformPrereqs
+  jobs:
+  - job: Deploy
+    strategy:
+      matrix:
+        Dev:
+          subscriptionId: 'SUBSCRIPTION_1_ID'
+          environment: 'dev'
+          location: 'eastus'
+          storageAccountSku: 'Standard_LRS'
+          resourceGroupName: 'rg-tfstate-dev'
+          storageAccountName: 'stterraformdev123'
+        Test:
+          subscriptionId: 'SUBSCRIPTION_1_ID'
+          environment: 'test'
+          location: 'eastus'
+          storageAccountSku: 'Standard_LRS'
+          resourceGroupName: 'rg-tfstate-test'
+          storageAccountName: 'stterraformtest123'
+        Acceptance:
+          subscriptionId: 'SUBSCRIPTION_2_ID'
+          environment: 'acceptance'
+          location: 'westus'
+          storageAccountSku: 'Standard_GRS'
+          resourceGroupName: 'rg-tfstate-acceptance'
+          storageAccountName: 'stterraformacc123'
+        Production:
+          subscriptionId: 'SUBSCRIPTION_2_ID'
+          environment: 'prod'
+          location: 'westus'
+          storageAccountSku: 'Standard_GRS'
+          resourceGroupName: 'rg-tfstate-prod'
+          storageAccountName: 'stterraformprod123'
+
+    steps:
+    - task: AzureCLI@2
+      displayName: 'Deploy Bicep Template'
+      inputs:
+        azureSubscription: '$(subscriptionId)' # Service connection name or subscription ID
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          az deployment sub create \
+            --location $(location) \
+            --template-file terraform-prereqs.bicep \
+            --parameters \
+              environment=$(environment) \
+              storageAccountName=$(storageAccountName) \
+              storageAccountSku=$(storageAccountSku) \
+              resourceGroupName=$(resourceGroupName) \
+              location=$(location) \
+              oidcIssuerUrl=$(oidcIssuerUrl) \
+              oidcSubject="sc://$(azureDevOpsOrgName)/$(azureDevOpsProjectName)/$(azureDevOpsPipelineName)"

@@ -1,0 +1,128 @@
+trigger:
+- main
+
+parameters:
+  - name: location
+    type: string
+    default: 'westeurope'
+    values:
+      - 'eastus'
+      - 'westus'
+      - 'northeurope'
+      - 'westeurope'
+
+  - name: environment
+    type: string
+    default: 'dev'
+    values:
+      - 'prd'
+      - 'acc'
+      - 'dev'
+      - 'tst'
+
+  - name: createResourceGroups
+    type: boolean
+    default: true
+
+  - name: tags
+    type: object
+    default:
+      environment: '$(environment)'
+      project: 'terraform-prereqs'
+
+  - name: storageAccountName
+    type: string
+    default: 'stterraform${{ parameters.environment }}123'
+
+  - name: storageAccountSku
+    type: string
+    default: 'Standard_LRS'
+
+  - name: blobContainerNames
+    type: object
+    default:
+      - 'tfstate'
+      - 'vaults-tfstate'
+      - 'backups-tfstate'
+      - 'csv-${{ parameters.environment }}'
+      - 'json-${{ parameters.environment }}'
+
+  - name: oidcIssuerUrl
+    type: string
+    default: 'https://example-issuer.com'
+
+  - name: oidcSubject
+    type: string
+    default: 'example-subject'
+
+variables:
+  - name: resourceGroupNames
+    value: ''
+  - name: managedIdentityId
+    value: ''
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+  - task: AzureCLI@2
+    displayName: 'Deploy Resource Groups'
+    inputs:
+      azureSubscription: '<your-service-connection-name>'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        az deployment sub create \
+          --location ${{ parameters.location }} \
+          --template-file resourceGroups.bicep \
+          --parameters \
+            location=${{ parameters.location }} \
+            environment=${{ parameters.environment }} \
+            createResourceGroups=${{ parameters.createResourceGroups }} \
+            tags='${{ convertToJson(parameters.tags) }}' \
+          --output json > resourceGroupsOutput.json
+        RESOURCE_GROUP_NAMES=$(jq -r '.properties.outputs.resourceGroupNames.value' resourceGroupsOutput.json)
+        echo "##vso[task.setvariable variable=resourceGroupNames]$RESOURCE_GROUP_NAMES"
+    condition: always()
+
+  - task: AzureCLI@2
+    displayName: 'Deploy Resources into First Resource Group'
+    inputs:
+      azureSubscription: '<your-service-connection-name>'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        FIRST_RG=$(echo $RESOURCE_GROUP_NAMES | jq -r '.[0]')
+        az deployment group create \
+          --resource-group $FIRST_RG \
+          --template-file rgResources.bicep \
+          --parameters \
+            location=${{ parameters.location }} \
+            environment=${{ parameters.environment }} \
+            storageAccountName=${{ parameters.storageAccountName }} \
+            storageAccountSku=${{ parameters.storageAccountSku }} \
+            blobContainerNames='${{ convertToJson(parameters.blobContainerNames) }}' \
+            oidcIssuerUrl=${{ parameters.oidcIssuerUrl }} \
+            oidcSubject=${{ parameters.oidcSubject }} \
+          --output json > rgResourcesOutput.json
+        MANAGED_IDENTITY_ID=$(jq -r '.properties.outputs.managedIdentityId.value' rgResourcesOutput.json)
+        echo "##vso[task.setvariable variable=managedIdentityId]$MANAGED_IDENTITY_ID"
+    condition: and(succeeded(), ne(variables.resourceGroupNames, ''))
+    retryCountOnTaskFailure: 2
+
+  - task: AzureCLI@2
+    displayName: 'Deploy RBAC'
+    inputs:
+      azureSubscription: '<your-service-connection-name>'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        echo "{\"environment\": \"${{ parameters.environment }}\", \"resourceGroupNames\": $RESOURCE_GROUP_NAMES, \"managedIdentityId\": \"$MANAGED_IDENTITY_ID\"}" > rbac.temp.parameters.json
+        az deployment sub create \
+          --location ${{ parameters.location }} \
+          --template-file rbac.bicep \
+          --parameters @rbac.temp.parameters.json \
+          --output json
+        rm rbac.temp.parameters.json
+    condition: and(succeeded(), ne(variables.managedIdentityId, ''))
+    retryCountOnTaskFailure: 2
