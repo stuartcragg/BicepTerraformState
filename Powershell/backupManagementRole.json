@@ -1,0 +1,28 @@
+{
+    "Name": "Multi-Resource Backup Manager",
+    "IsCustom": true,
+    "Description": "Grants permissions to query tags and manage backups for multiple Azure resource types.",
+    "Actions": [
+      // Read permissions for querying tags and metadata
+      "Microsoft.Storage/storageAccounts/read",                    // Storage Accounts
+      "Microsoft.Compute/disks/read",                            // Azure Disks
+      "Microsoft.DBforPostgreSQL/servers/read",                  // PostgreSQL Servers
+      "Microsoft.ContainerService/managedClusters/read",         // AKS
+      "Microsoft.DBforPostgreSQL/flexibleServers/read",          // PostgreSQL Flexible Servers
+      "Microsoft.DBforMySQL/flexibleServers/read",               // MySQL Flexible Servers
+      
+      // Backup-related permissions
+      "Microsoft.DataProtection/backupVaults/read",              // Read backup vaults
+      "Microsoft.DataProtection/backupVaults/write",             // Create/update backup vaults
+      "Microsoft.DataProtection/backupPolicies/read",            // Read backup policies
+      "Microsoft.DataProtection/backupPolicies/write",           // Create/update backup policies
+      "Microsoft.DataProtection/backupInstances/read",           // Read backup instances
+      "Microsoft.DataProtection/backupInstances/write"           // Configure backups on resources
+    ],
+    "NotActions": [],
+    "DataActions": [],
+    "NotDataActions": [],
+    "AssignableScopes": [
+      "/subscriptions/{subscription-id}"                       // Replace with your subscription ID
+    ]
+  }
